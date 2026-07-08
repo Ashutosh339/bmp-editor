@@ -29,6 +29,12 @@ struct BMPInfoHeader {
 
 #pragma pack(pop)
 
+struct RGBPixel {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+};
+
 void readBMP(const char* filename) {
     std::ifstream file(filename, std::ios::binary);
     
@@ -46,6 +52,22 @@ void readBMP(const char* filename) {
     std::cout << "File Type: " << std::hex << fileHeader.fileType << std::endl;
     std::cout << "Width: " << infoHeader.width << " px" << std::endl;
     std::cout << "Height: " << infoHeader.height << " px" << std::endl;
+
+    uint8_t padding = infoHeader.width % 4;
+    char pad_array[9];
+
+    RGBPixel* rawimage = new RGBPixel[infoHeader.width*infoHeader.height];
+    for(int i = 0; i < infoHeader.height; i++) {
+     for(int j = 0; j < infoHeader.width; j++) {
+      file.read(reinterpret_cast<char*>(&rawimage[infoHeader.width*i + j]), sizeof(RGBPixel));
+     }
+     file.read(&pad_array[0], padding);
+    }
+
+    // You would interpret the pixel data here.
+
+    delete[] rawimage;
+
 }
 
 int main() {
