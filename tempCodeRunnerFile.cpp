@@ -1,17 +1,24 @@
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include <cstdint>
 
-// Prevent compiler padding to ensure the struct matches the file format exactly
 #pragma pack(push, 1)
+struct RGBPixel {
+    uint8_t r, g, b;
+};
+
+// Validate that RGBPixel is exactly 3 bytes
+static_assert(sizeof(RGBPixel) == 3, "RGBPixel must be exactly 3 bytes");
 
 struct BMPFileHeader {
-    uint16_t fileType{0x4D42}; // "BM"
+    uint16_t fileType{0x4D42};
     uint32_t fileSize{0};
     uint16_t reserved1{0};
     uint16_t reserved2{0};
     uint32_t offsetData{0};
 };
+
 struct BMPInfoHeader {
     uint32_t size{0};
     int32_t width{0};
@@ -25,17 +32,10 @@ struct BMPInfoHeader {
     uint32_t colorsUsed{0};
     uint32_t colorsImportant{0};
 };
-
 #pragma pack(pop)
-struct RGBPixel {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-};
 
 void readBMP(const char* filename) {
     std::ifstream file(filename, std::ios::binary);
-    
     if (!file) {
         std::cerr << "Could not open file." << std::endl;
         return;
@@ -47,29 +47,28 @@ void readBMP(const char* filename) {
     file.read(reinterpret_cast<char*>(&fileHeader), sizeof(fileHeader));
     file.read(reinterpret_cast<char*>(&infoHeader), sizeof(infoHeader));
 
-    std::cout << "File Type: " << std::hex << fileHeader.fileType << std::endl;
-    std::cout << "Width: " << infoHeader.width << " px" << std::endl;
-    std::cout << "Height: " << infoHeader.height << " px" << std::endl;
+    // Move file pointer to the start of pixel data
+    file.seekg(fileHeader.offsetData, std::ios::beg);
 
-    uint8_t padding = infoHeader.width % 4;
-    char pad_array[9];
+    // Calculate padding per row (each row must be a multiple of 4 bytes)
+    int row_bytes = infoHeader.width * sizeof(RGBPixel);
+    uint8_t padding = (4 - (row_bytes % 4)) % 4;
 
-    RGBPixel* rawimage = new RGBPixel[infoHeader.width*infoHeader.height];
-    for(int i = 0; i < infoHeader.height; i++) {
-     for(int j = 0; j < infoHeader.width; j++) {
-      file.read(reinterpret_cast<char*>(&rawimage[infoHeader.width*i + j]), sizeof(RGBPixel));
-     }
-     file.read(&pad_array[0], padding);
+    // Use std::vector for safe memory management
+    std::vector<RGBPixel> rawimage(infoHeader.width * infoHeader.height);
+
+    for (int i = 0; i < infoHeader.height; ++i) {
+        // Read the entire row
+        file.read(reinterpret_cast<char*>(&rawimage[i * infoHeader.width]), row_bytes);
+        
+        // Skip the padding bytes
+        file.seekg(padding, std::ios::cur);
     }
 
-    // You would interpret the pixel data here.
-
-    delete[] rawimage;
-
+    std::cout << "Successfully read " << rawimage.size() << " pixels." << std::endl;
 }
-
 int main() {
-    // Replace with a path to a real .bmp file
+    // Your logic here
     readBMP("test.bmp");
     return 0;
 }
